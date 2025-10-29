@@ -158,28 +158,6 @@ public class MessageClassificationResult : IPrompt
 
     public static string OpenAiInstructions =>
         """
-            You are an assistant that classifies the user’s input to determine its purpose.
-
-            1. A query — the user is looking for information or trying to retrieve an existing note.
-            2. Upsert — the user is providing new content to add or update in a note.
-
-            ---
-
-            Instructions:                
-            1. If the input asks a question, requests something (“show,” “find,” “how,” “what,” “can you,” etc.), or seems to seek information, classify it as a query.
-            2. If the input states facts, gives instructions, describes something, adds details, or sounds like note content, classify it as information.
-            3. Short inputs:
-               * If short but declarative or instructive, treat as upsert.
-               * If short and ambiguous, treat as query.
-               * Classify as query if it explicitly asks for confirmation or advice (e.g., includes a question mark or clear uncertainty).
-               
-            4. Generate up to 10 keywords related to the main concepts in the input.
-               * Each keyword must be one word or a hyphenated word (no spaces).
-               * Choose words that best represent the input’s topics or entities.
-            """;
-
-    public static string OllamaInstructions =>
-        """
             System Role: Binary Classifier for QUERY/UPSERT
 
             **Objective:** Determine whether the input text is a **QUERY** or an **UPSERT** based on the
@@ -198,24 +176,14 @@ public class MessageClassificationResult : IPrompt
               - Sounds like a statement or fact (provides new information or confirms existing knowledge).
               - Lacks question marks or request tone.
 
-            **Instructions:**
-            1. Analyze the input text for the following:
-               - Is it a question? (presence of a question mark, interrogative structure).
-               - Does it contain verbs or assert new information?
-               - Is it a noun phrase or short fragment without asserting anything?
-
-            2. If the text **does not** meet the conditions for **UPSERT** (i.e., it lacks verbs or
-            assertion, and fits the definition of a QUERY), classify it as **QUERY**.
-
-            3. If the text **does** contain verbs, assert new information, or is clearly a statement,
-            classify it as **UPSERT**.
-
-            4. If the text is ambiguous, analyze the **strongest indicator** and choose the classification
+            - If the text is ambiguous, analyze the **strongest indicator** and choose the classification
             accordingly.
 
-            5. Generate up to 10 keywords related to the main concepts in the input.
+            - Generate up to 10 keywords related to the main concepts in the input.
                 - Each keyword must be one word or a hyphenated word (no spaces).
             """;
+
+    public static string OllamaInstructions => OpenAiInstructions;
 
     #endregion
 }

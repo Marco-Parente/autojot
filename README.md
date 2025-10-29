@@ -45,7 +45,7 @@ AutoJot is a C#/.NET bot designed to help users manage notes efficiently. It sup
    dotnet run --project AppHost
    ```
 
-1. When all setup and running, you may type out anything in the bot chat. 
+1. When all setup and running, you may type out anything in the bot chat.
 2. It'll try to classify your message as a **query** or an **upsert** and get some keywords based on your input: 
    1. **Query**:
       1. A list of best file matches (based on the file name, tags and the keywords gotten from your input) will be returned.
@@ -62,6 +62,8 @@ AutoJot is a C#/.NET bot designed to help users manage notes efficiently. It sup
             2. Update the tags, if necessary
             3. Update the 'updated_at' tag
             4. Return the updated file content and ask if the user wants to save os discard the changes made
+
+- You may also provide your intent to skip the classification part of the flow  by prepending your input with '/search' or '/upsert'
 
 ## Example usages
 ### Querying for an existing note
