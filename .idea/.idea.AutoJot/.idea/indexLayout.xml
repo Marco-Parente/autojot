@@ -8,6 +8,7 @@
       <Path>.idea</Path>
       <Path>AiDiary.sln.DotSettings.user</Path>
       <Path>AutoJot.sln.DotSettings.user</Path>
+      <Path>README.md</Path>
     </explicitIncludes>
     <explicitExcludes />
   </component>
