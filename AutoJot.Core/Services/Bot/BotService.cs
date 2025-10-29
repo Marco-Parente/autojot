@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Core.Services.AI;
 using Core.Services.Files;
+using Core.Services.Message;
+using Core.Services.UserState;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -77,7 +79,7 @@ public class BotService : IBotService
         }
     }
 
-    private async Task<UserState> GetAction(UserState userState, string message)
+    private async Task<UserState.UserState> GetAction(UserState.UserState userState, string message)
     {
         if (message.StartsWith("/search"))
         {
@@ -90,11 +92,6 @@ public class BotService : IBotService
         if (message.StartsWith("/upsert"))
         {
             return await HandleUpsert(userState, message["/upsert".Length..].Trim());
-        }
-
-        if (message.StartsWith("/test"))
-        {
-            await _aiService.Test();
         }
 
         var classification = await _aiService.ClassifyMessage(message);
@@ -124,7 +121,10 @@ public class BotService : IBotService
         return userState with { CurrentAction = BotAction.Finish };
     }
 
-    private async Task<UserState> TryNextAction(UserState userState, string message)
+    private async Task<UserState.UserState> TryNextAction(
+        UserState.UserState userState,
+        string message
+    )
     {
         var menu =
             userState.Messages.OfType<MenuMessage>().LastOrDefault()
@@ -140,12 +140,17 @@ public class BotService : IBotService
 
         return userState with
         {
-            SelectedFile = menu.FileOptions.Contains(selectedOption) ? selectedOption.Name : null,
+            SelectedFile = menu.FileOptions.Contains(selectedOption)
+                ? selectedOption.Name
+                : userState.SelectedFile,
             CurrentAction = selectedOption.Action,
         };
     }
 
-    private async Task<UserState> HandleUpsert(UserState userState, string input)
+    private async Task<UserState.UserState> HandleUpsert(
+        UserState.UserState userState,
+        string input
+    )
     {
         string? fileName = null;
 
@@ -212,8 +217,8 @@ public class BotService : IBotService
         };
     }
 
-    private async Task<UserState> HandleQuery(
-        UserState userState,
+    private async Task<UserState.UserState> HandleQuery(
+        UserState.UserState userState,
         List<string> classificationKeywords
     )
     {
@@ -236,7 +241,6 @@ public class BotService : IBotService
             {
                 CurrentAction = BotAction.DisplayNoteContent,
                 SelectedFile = bestMatch.RelativeFilePath,
-                FileContent = _fileService.GetFileContent(_rootPath, bestMatch.RelativeFilePath),
             };
         }
 
@@ -261,7 +265,7 @@ public class BotService : IBotService
         };
     }
 
-    private async Task<UserState> HandleDisplayNoteContent(UserState userState)
+    private async Task<UserState.UserState> HandleDisplayNoteContent(UserState.UserState userState)
     {
         userState = await SendMessage(
             userState,
@@ -279,43 +283,48 @@ public class BotService : IBotService
         };
     }
 
-    private async Task<UserState> HandleUpdateNote(UserState userState)
+    private async Task<UserState.UserState> HandleUpdateNote(UserState.UserState userState)
     {
+        if (!string.IsNullOrEmpty(userState.FileContent))
+        {
+            _fileService.UpsertFile(_rootPath, userState.SelectedFile!, userState.FileContent);
+            return userState with { CurrentAction = BotAction.Finish };
+        }
+
         var userInput =
             userState
                 .Messages.OfType<TextMessage>()
                 .FirstOrDefault(x => x.TextOrigin == TextOrigin.User)
-            ?? throw new Exception("User input not found while trying to create note");
+            ?? throw new Exception("User input not found while trying to update note");
 
-        var updatedNote = await _aiService.UpdateNote(
-            userInput.Message,
-            _fileService.GetFileContent(_rootPath, userState.SelectedFile!)
-        );
+        var originalFile = _fileService.GetFileContent(_rootPath, userState.SelectedFile!);
 
-        // TODO: Confirm update?
-        _fileService.UpsertFile(_rootPath, userState.SelectedFile!, updatedNote.Content);
+        var updatedNote = await _aiService.UpdateNote(userInput.Message, originalFile);
 
-        // TODO: Use diffplex
         userState = await SendMessage(
             userState,
-            new TextMessage
+            new MenuMessage
             {
-                Message = $"""
-                File Updated:"{userState.SelectedFile}"
-
+                HeaderText = $"""
+                Updated note:
                 {updatedNote.Content}
                 """,
-                TextOrigin = TextOrigin.System,
+                ExtraOptions =
+                [
+                    new MenuOption { Name = "Confirm update", Action = BotAction.UpdateNote },
+                    new MenuOption { Name = "Discard changes", Action = BotAction.Finish },
+                ],
             }
-        );
-
-        return userState with
+        ) with
         {
-            CurrentAction = BotAction.Finish,
+            CurrentAction = BotAction.WaitForInput,
+            FileContent = updatedNote.Content,
         };
+
+        return userState;
     }
 
-    private async Task<UserState> HandleCreateNote(UserState userState)
+    private async Task<UserState.UserState> HandleCreateNote(UserState.UserState userState)
     {
         var userInput =
             userState
@@ -349,7 +358,10 @@ public class BotService : IBotService
         };
     }
 
-    private async Task<UserState> SendMessage(UserState userState, IChatMessage message)
+    private async Task<UserState.UserState> SendMessage(
+        UserState.UserState userState,
+        IChatMessage message
+    )
     {
         var txtMessage = message.ToString() ?? throw new Exception("Cant send empty message");
         await _messageService.SendMessage(userState.UserKey, txtMessage);

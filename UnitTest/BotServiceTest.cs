@@ -1,5 +1,6 @@
 using Core.Services;
 using Core.Services.Bot;
+using Core.Services.UserState;
 
 namespace UnitTest;
 

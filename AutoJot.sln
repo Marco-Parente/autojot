@@ -2,8 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppHost", "AppHost\AppHost.csproj", "{DD3FEA36-253D-46D8-88D2-89803237C2E6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoJot.Api", "AutoJot.Api\AutoJot.Api.csproj", "{529616B9-DCFB-43D2-93B5-E0DB16865A2B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoJot.Core", "AutoJot.Core\AutoJot.Core.csproj", "{D0CB04CA-7EDF-4432-961D-6EA68EAC44B1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTest.csproj", "{23D7C039-939A-4527-B9AD-4A4B5BFC9A4D}"
@@ -20,10 +18,6 @@ Global
 		{DD3FEA36-253D-46D8-88D2-89803237C2E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DD3FEA36-253D-46D8-88D2-89803237C2E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DD3FEA36-253D-46D8-88D2-89803237C2E6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{529616B9-DCFB-43D2-93B5-E0DB16865A2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{529616B9-DCFB-43D2-93B5-E0DB16865A2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{529616B9-DCFB-43D2-93B5-E0DB16865A2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{529616B9-DCFB-43D2-93B5-E0DB16865A2B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D0CB04CA-7EDF-4432-961D-6EA68EAC44B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D0CB04CA-7EDF-4432-961D-6EA68EAC44B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0CB04CA-7EDF-4432-961D-6EA68EAC44B1}.Release|Any CPU.ActiveCfg = Release|Any CPU

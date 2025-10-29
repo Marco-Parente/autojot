@@ -1,6 +1,13 @@
 using Core.Services.Bot;
 
-namespace Core.Services;
+namespace Core.Services.UserState;
+
+public interface IUserStateService
+{
+    public Task<UserState> GetUserState(string key);
+    public Task SetUserState(string key, UserState content);
+    public Task ClearUserState(string key);
+}
 
 public record UserState
 {
@@ -19,12 +26,12 @@ public record UserState
 
 public interface IChatMessage;
 
-public class TextMessage : IChatMessage
+public record TextMessage : IChatMessage
 {
     public string Message { get; set; } = null!;
     public TextOrigin TextOrigin { get; set; }
 
-    public override string? ToString()
+    public override string ToString()
     {
         return Message;
     }
@@ -36,8 +43,12 @@ public enum TextOrigin
     User = 20,
 }
 
-public class MenuMessage : IChatMessage
+public record MenuMessage : IChatMessage
 {
+    public string HeaderText { get; set; } = "Multiple file matches found:";
+    public string FooterText { get; set; } =
+        "Which option do you wanna choose? (select by index number)";
+
     public IReadOnlyList<MenuOption> FileOptions { get; set; } = [];
     public IReadOnlyList<MenuOption> ExtraOptions { get; set; } = [];
 
@@ -53,10 +64,10 @@ public class MenuMessage : IChatMessage
         return allOptions.ElementAtOrDefault(index);
     }
 
-    public override string? ToString()
+    public override string ToString()
     {
         var currentIndex = 0;
-        var message = "Multiple matches found:\n\n";
+        var message = $"{HeaderText}\n\n";
 
         foreach (var option in FileOptions)
         {
@@ -74,72 +85,14 @@ public class MenuMessage : IChatMessage
             }
         }
 
-        message += "\n\nWhich option do you wanna choose? (select by index number)";
+        message += $"\n\n{FooterText}";
 
         return message;
     }
 }
 
-public class MenuOption
+public record MenuOption
 {
     public required string Name { get; set; }
     public BotAction Action { get; set; }
-}
-
-public interface IUserStateService
-{
-    public Task<UserState> GetUserState(string key);
-    public Task SetUserState(string key, UserState content);
-    public Task ClearUserState(string key);
-}
-
-public class InMemoryUserStateService : IUserStateService
-{
-    private static readonly Dictionary<string, UserState> Store = new();
-    private static readonly Lock Lock = new();
-
-    private UserState CreateNewUserState(string key)
-    {
-        var state = new UserState { UserKey = key };
-
-        lock (Lock)
-        {
-            Store[key] = state;
-        }
-
-        return state;
-    }
-
-    public Task<UserState> GetUserState(string key)
-    {
-        lock (Lock)
-        {
-            var state = Store.GetValueOrDefault(key);
-            if (state != null)
-            {
-                return Task.FromResult(state);
-            }
-        }
-
-        return Task.FromResult(CreateNewUserState(key));
-    }
-
-    public Task SetUserState(string key, UserState content)
-    {
-        lock (Lock)
-        {
-            Store[key] = content;
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public Task ClearUserState(string key)
-    {
-        lock (Lock)
-        {
-            Store.Remove(key);
-        }
-        return Task.CompletedTask;
-    }
 }

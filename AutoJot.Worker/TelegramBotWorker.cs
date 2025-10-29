@@ -1,6 +1,5 @@
-using Core;
-using Core.Services;
 using Core.Services.Bot;
+using Core.Services.Message;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;

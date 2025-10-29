@@ -1,12 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Telegram.Bot;
 
-namespace Core.Services;
-
-public interface IMessageService
-{
-    public Task SendMessage(string userKey, string message);
-}
+namespace Core.Services.Message;
 
 public class TelegramMessageService : IMessageService
 {
@@ -26,7 +21,7 @@ public class TelegramMessageService : IMessageService
     {
         var client = new TelegramBotClient(
             _configuration.GetValue<string?>("Telegram:BotToken")
-                ?? throw new NullReferenceException("Telegram bot token not set")
+            ?? throw new NullReferenceException("Telegram bot token not set")
         );
 
         await client.SendMessage(GetUserIdFromUserKey(userKey), message);
