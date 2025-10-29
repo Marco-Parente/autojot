@@ -67,10 +67,32 @@ AutoJot is a C#/.NET bot designed to help users manage notes efficiently. It sup
 
 ## Example usages
 ### Querying for an existing note
+<img width="742" height="427" alt="image" src="https://github.com/user-attachments/assets/dfdd0fbd-343f-445d-b732-9598d665147b" />
+
+---
 
 ### Creating a new note
+- Recipe copied and paste from internet:
+<img width="736" height="552" alt="image" src="https://github.com/user-attachments/assets/fc89f862-3124-444e-95ab-25141f686b21" />
+
+- Bot detected as an upsert, choose if i want to update a file or create a new one (sorry for the censored part :p):
+<img width="715" height="516" alt="image" src="https://github.com/user-attachments/assets/95237bde-2b27-40e2-b9ae-46b582a6c932" />
+
+- New note is created
+<img width="705" height="377" alt="image" src="https://github.com/user-attachments/assets/5870cec5-a287-4c26-aa86-7cd82b7ae574" />
+
+- Great to use with apps like Obsidian, as it gets rendered nicely:
+<img width="626" height="625" alt="image" src="https://github.com/user-attachments/assets/ab610644-0399-47cb-bc38-b5c99bcc77a5" />
+
+---
 
 ### Updating an existing note
+- Just said to the bot the chocolate cake should be in the oven for 3 hours (dont worry, it's just an example 🧯🔥)
+<img width="468" height="300" alt="image" src="https://github.com/user-attachments/assets/c1cd6f37-a7bd-4174-b8c6-4c79ed1b149d" />
+
+
+- The relevant part of the note gets automatically updated:
+<img width="742" height="557" alt="image" src="https://github.com/user-attachments/assets/0cd96a9d-61f3-490f-b4d5-6f02c54ba544" />
 
 
 ## Notes
