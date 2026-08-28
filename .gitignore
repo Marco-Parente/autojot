@@ -3,3 +3,13 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+# IDE / user-local files
+.idea/
+.vs/
+*.user
+*.DotSettings.user
+
+# Local configuration — secrets belong in user-secrets or environment variables
+appsettings.Development.json
+appsettings.*.local.json

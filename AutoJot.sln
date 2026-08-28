@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoJot.Worker", "AutoJot.Worker\AutoJot.Worker.csproj", "{C7A4165A-58D1-42A6-A7E3-6329CAFA4704}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestingApp", "TestingApp\TestingApp.csproj", "{E34B64E3-FD20-4F0B-B941-B3709DA9F6F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{C7A4165A-58D1-42A6-A7E3-6329CAFA4704}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7A4165A-58D1-42A6-A7E3-6329CAFA4704}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7A4165A-58D1-42A6-A7E3-6329CAFA4704}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E34B64E3-FD20-4F0B-B941-B3709DA9F6F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E34B64E3-FD20-4F0B-B941-B3709DA9F6F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E34B64E3-FD20-4F0B-B941-B3709DA9F6F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E34B64E3-FD20-4F0B-B941-B3709DA9F6F1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

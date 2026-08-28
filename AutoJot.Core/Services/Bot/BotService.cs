@@ -196,6 +196,7 @@ public class BotService : IBotService
             userState,
             new MenuMessage
             {
+                HeaderText = "Upsert a note... Multiple options found:",
                 FileOptions = matches
                     .Select(x => new MenuOption
                     {
@@ -248,6 +249,7 @@ public class BotService : IBotService
             userState,
             new MenuMessage
             {
+                HeaderText = "Querying notes... Multiple options found:",
                 FileOptions = bestMatches
                     .Select(x => new MenuOption
                     {
