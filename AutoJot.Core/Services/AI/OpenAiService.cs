@@ -2,7 +2,8 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
+using Core.Shared;
+using Microsoft.Extensions.Options;
 using OpenAI.Responses;
 
 #pragma warning disable OPENAI001
@@ -11,13 +12,13 @@ namespace Core.Services.AI;
 
 public class OpenAiService : IAiService
 {
-    private const string Model = "gpt-5-nano";
+    private readonly OpenAIResponseClient _client;
+    private readonly string _model;
 
-    private readonly IConfiguration _configuration;
-
-    public OpenAiService(IConfiguration configuration)
+    public OpenAiService(IOptions<OpenAiOptions> options)
     {
-        _configuration = configuration;
+        _model = options.Value.Model;
+        _client = new OpenAIResponseClient(_model, options.Value.ApiKey);
     }
 
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -28,14 +29,17 @@ public class OpenAiService : IAiService
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    private async Task<TPrompt> QueryOpenAiAsync<TPrompt>(string prompt)
+    private async Task<TPrompt> QueryOpenAiAsync<TPrompt>(
+        string prompt,
+        CancellationToken cancellationToken
+    )
         where TPrompt : IPrompt
     {
-        var client = new OpenAIResponseClient(
-            Model,
-            _configuration.GetValue<string?>("OpenAi:ApiKey")
-                ?? throw new Exception("The open ai api key is missing.")
+        using var activity = AutoJotDiagnostics.ActivitySource.StartActivity(
+            $"ai.openai {typeof(TPrompt).Name}"
         );
+        activity?.SetTag("ai.provider", "openai");
+        activity?.SetTag("ai.model", _model);
 
         var options = new ResponseCreationOptions
         {
@@ -51,7 +55,7 @@ public class OpenAiService : IAiService
             Instructions = TPrompt.OpenAiInstructions,
         };
 
-        var response = await client.CreateResponseAsync(prompt, options);
+        var response = await _client.CreateResponseAsync(prompt, options, cancellationToken);
 
         var final = JsonSerializer.Deserialize<TPrompt>(
             response.Value.GetOutputText(),
@@ -61,18 +65,23 @@ public class OpenAiService : IAiService
         return final!;
     }
 
-    public async Task<MessageClassificationResult> ClassifyMessage(string userInput)
+    public async Task<MessageClassificationResult> ClassifyMessage(
+        string userInput,
+        CancellationToken cancellationToken = default
+    )
     {
         var conversationHistory = new List<dynamic> { new { role = "user", content = userInput } };
 
         return await QueryOpenAiAsync<MessageClassificationResult>(
-            JsonSerializer.Serialize(conversationHistory, _jsonOptions)
+            JsonSerializer.Serialize(conversationHistory, _jsonOptions),
+            cancellationToken
         );
     }
 
     public async Task<CreateNoteResult> CreateNote(
         string userInput,
-        List<string>? existingFolders = null
+        List<string> existingFolders,
+        CancellationToken cancellationToken = default
     )
     {
         var conversationHistory = new List<dynamic>
@@ -82,11 +91,16 @@ public class OpenAiService : IAiService
         };
 
         return await QueryOpenAiAsync<CreateNoteResult>(
-            JsonSerializer.Serialize(conversationHistory, _jsonOptions)
+            JsonSerializer.Serialize(conversationHistory, _jsonOptions),
+            cancellationToken
         );
     }
 
-    public async Task<UpdateNoteResult> UpdateNote(string input, string existingFileContent)
+    public async Task<UpdateNoteResult> UpdateNote(
+        string input,
+        string existingFileContent,
+        CancellationToken cancellationToken = default
+    )
     {
         var conversationHistory = new List<dynamic>
         {
@@ -95,17 +109,22 @@ public class OpenAiService : IAiService
         };
 
         return await QueryOpenAiAsync<UpdateNoteResult>(
-            JsonSerializer.Serialize(conversationHistory, _jsonOptions)
+            JsonSerializer.Serialize(conversationHistory, _jsonOptions),
+            cancellationToken
         );
     }
 
-    public async Task<List<string>> GetKeyWords(string input)
+    public async Task<List<string>> GetKeyWords(
+        string input,
+        CancellationToken cancellationToken = default
+    )
     {
         var conversationHistory = new List<dynamic> { new { type = "input", content = input } };
 
         return (
             await QueryOpenAiAsync<GetKeywordsResult>(
-                JsonSerializer.Serialize(conversationHistory, _jsonOptions)
+                JsonSerializer.Serialize(conversationHistory, _jsonOptions),
+                cancellationToken
             )
         ).Keywords;
     }

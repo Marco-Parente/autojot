@@ -1,49 +1,44 @@
-using System.Text.RegularExpressions;
-using Core.Shared;
-
 namespace Core.Services.Files;
 
 public class LocalFileService : IFilesService
 {
-    private static List<string> GetFiles(string? rootPath = null, string? searchPattern = "*")
+    /// <summary>
+    /// Resolves a vault-relative path to an absolute one, refusing anything that escapes the vault.
+    /// Path.Combine silently drops <paramref name="rootPath"/> when the second argument is rooted,
+    /// so an absolute or "../" path suggested by the AI would otherwise write outside the vault.
+    /// </summary>
+    private static string ResolveVaultPath(
+        string rootPath,
+        string relativeFilePath,
+        bool requireMarkdown = false
+    )
     {
-        searchPattern ??= "*";
-        rootPath ??= Directory.GetCurrentDirectory();
+        if (string.IsNullOrWhiteSpace(rootPath))
+            throw new ArgumentException("Root path is required", nameof(rootPath));
 
-        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(relativeFilePath))
+            throw new ArgumentException("File path is required", nameof(relativeFilePath));
 
-        try
+        var root = Path.GetFullPath(rootPath);
+        var rootPrefix = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+
+        var fullPath = Path.GetFullPath(Path.Combine(root, relativeFilePath));
+
+        if (!fullPath.StartsWith(rootPrefix, StringComparison.Ordinal))
         {
-            foreach (var file in Directory.EnumerateFiles(rootPath, searchPattern))
-            {
-                var attr = File.GetAttributes(file);
-
-                if ((attr & (FileAttributes.Hidden | FileAttributes.System)) == 0)
-                {
-                    result.Add(Path.GetRelativePath(rootPath, file));
-                }
-            }
-
-            foreach (var dir in Directory.EnumerateDirectories(rootPath))
-            {
-                var attr = File.GetAttributes(dir);
-
-                // skip hidden or system folders
-                if ((attr & (FileAttributes.Hidden | FileAttributes.System)) == 0)
-                {
-                    result.AddRange(
-                        GetFiles(dir, searchPattern)
-                            .Select(sub => Path.Combine(Path.GetFileName(dir), sub))
-                    );
-                }
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // skip folders/files you can’t access
+            throw new VaultPathException(
+                $"Path '{relativeFilePath}' resolves outside the notes vault."
+            );
         }
 
-        return result;
+        if (requireMarkdown && !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new VaultPathException($"Path '{relativeFilePath}' is not a Markdown note.");
+        }
+
+        return fullPath;
     }
 
     public List<string> GetFolders(string? rootPath = null)
@@ -81,57 +76,24 @@ public class LocalFileService : IFilesService
 
     public string GetFileContent(string rootPath, string relativeFilePath)
     {
-        return File.ReadAllText(Path.Combine(rootPath, relativeFilePath));
+        return File.ReadAllText(ResolveVaultPath(rootPath, relativeFilePath));
     }
 
     public bool FileExists(string rootPath, string relativeFilePath)
     {
-        return File.Exists(Path.Combine(rootPath, relativeFilePath));
-    }
-
-    public List<string>? GetFileTags(string rootPath, string relativeFilePath)
-    {
-        var text = File.ReadAllText(Path.Combine(rootPath, relativeFilePath));
-
-        if (string.IsNullOrEmpty(text))
-            return null;
-
-        // Match start-of-string, optional BOM, then '---' on its own line, then capture until next '---' on its own line.
-        // DOTALL equivalent: (?s) so '.' matches newlines.
-        // Accept both \n and \r\n line endings.
-        var pattern = @"\A(\uFEFF)?---\s*\r?\n(?s)(.*?)\r?\n---\s*\r?\n?";
-        var match = Regex.Match(text, pattern, RegexOptions.None);
-
-        if (!match.Success)
+        try
         {
-            // no front matter -> full text is content
-            return null;
+            return File.Exists(ResolveVaultPath(rootPath, relativeFilePath));
         }
-
-        var yaml = match.Groups[2].Value;
-        // var content = text.Substring(match.Length); // rest of document after closing ---
-
-        return string.IsNullOrEmpty(yaml) ? null : YamlHelper.ExtractTags(yaml);
-    }
-
-    public List<FileSummary> GetFilesWithTags(string rootPath)
-    {
-        var files = GetFiles(rootPath);
-
-        return files
-            .Select(file => new FileSummary { FilePath = file, Tags = GetFileTags(rootPath, file) })
-            .ToList();
+        catch (VaultPathException)
+        {
+            return false;
+        }
     }
 
     public void UpsertFile(string rootPath, string relativeFilePath, string content)
     {
-        if (string.IsNullOrWhiteSpace(rootPath))
-            throw new ArgumentNullException(nameof(rootPath));
-
-        if (string.IsNullOrWhiteSpace(relativeFilePath))
-            throw new ArgumentNullException(nameof(relativeFilePath));
-
-        var fullPath = Path.Combine(rootPath, relativeFilePath);
+        var fullPath = ResolveVaultPath(rootPath, relativeFilePath, requireMarkdown: true);
 
         try
         {
@@ -150,45 +112,5 @@ public class LocalFileService : IFilesService
                 ex
             );
         }
-    }
-
-    public List<MatchResult> GetMatchResults(string rootPath, List<string> keywords)
-    {
-        if (string.IsNullOrWhiteSpace(rootPath))
-            throw new ArgumentNullException(nameof(rootPath));
-
-        if (keywords.Count == 0)
-            return [];
-
-        if (!Directory.Exists(rootPath))
-            throw new DirectoryNotFoundException($"Directory not found: {rootPath}");
-
-        var results = new List<MatchResult>();
-
-        // Enumerate all Markdown files (you can extend to .txt, etc.)
-        var files = Directory.EnumerateFiles(rootPath, "*.md", SearchOption.AllDirectories);
-
-        foreach (var filePath in files)
-        {
-            var tags = GetFileTags(rootPath, filePath) ?? [];
-
-            var score = tags.Count(tag => keywords.Contains(tag, StringComparer.OrdinalIgnoreCase));
-
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
-            score += keywords
-                .Where(keyword => fileName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-                .Sum(_ => 2);
-
-            results.Add(
-                new MatchResult
-                {
-                    RelativeFilePath = Path.GetRelativePath(rootPath, filePath),
-                    Score = score,
-                }
-            );
-        }
-
-        // Sort results by descending score
-        return results.OrderByDescending(r => r.Score).ThenBy(x => x.RelativeFilePath).ToList();
     }
 }

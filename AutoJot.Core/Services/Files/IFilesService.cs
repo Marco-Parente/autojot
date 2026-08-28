@@ -1,22 +1,23 @@
 namespace Core.Services.Files;
 
+/// <summary>
+/// Raw access to the notes vault. Searching lives in <see cref="Search.INoteIndex"/>.
+/// </summary>
 public interface IFilesService
 {
     List<string> GetFolders(string? rootPath = null);
     string GetFileContent(string rootPath, string relativeFilePath);
     bool FileExists(string rootPath, string relativeFilePath);
     void UpsertFile(string rootPath, string relativeFilePath, string content);
-    List<MatchResult> GetMatchResults(string rootPath, List<string> keywords);
 }
 
-public class MatchResult
+/// <summary>
+/// Thrown when a path would resolve outside the notes vault, or is otherwise not a note we are
+/// willing to touch. File paths reaching the file service can be suggested by the AI model, so they
+/// are treated as untrusted input.
+/// </summary>
+public class VaultPathException : Exception
 {
-    public string RelativeFilePath { get; set; } = null!;
-    public int Score { get; set; }
-}
-
-public class FileSummary
-{
-    public string FilePath { get; set; } = null!;
-    public List<string>? Tags { get; set; } = [];
+    public VaultPathException(string message)
+        : base(message) { }
 }

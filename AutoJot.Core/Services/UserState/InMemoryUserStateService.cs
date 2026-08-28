@@ -1,52 +1,47 @@
+using Microsoft.Extensions.Caching.Memory;
+
 namespace Core.Services.UserState;
 
 public class InMemoryUserStateService : IUserStateService
 {
-    private static readonly Dictionary<string, UserState> Store = new();
-    private static readonly Lock Lock = new();
+    /// <summary>
+    /// A conversation abandoned mid-menu would otherwise keep the user pinned in
+    /// <see cref="Bot.BotAction.WaitForInput"/> forever, and keep their state alive for the life of
+    /// the process. Sliding, so an active conversation is never cut off mid-flow.
+    /// </summary>
+    public static readonly TimeSpan Expiry = TimeSpan.FromMinutes(30);
 
-    private UserState CreateNewUserState(string key)
+    private readonly IMemoryCache _cache;
+
+    public InMemoryUserStateService(IMemoryCache cache)
     {
-        var state = new UserState { UserKey = key };
-
-        lock (Lock)
-        {
-            Store[key] = state;
-        }
-
-        return state;
+        _cache = cache;
     }
 
     public Task<UserState> GetUserState(string key)
     {
-        lock (Lock)
-        {
-            var state = Store.GetValueOrDefault(key);
-            if (state != null)
-            {
-                return Task.FromResult(state);
-            }
-        }
+        var state =
+            _cache.GetOrCreate(
+                key,
+                entry =>
+                {
+                    entry.SlidingExpiration = Expiry;
+                    return new UserState { UserKey = key };
+                }
+            ) ?? new UserState { UserKey = key };
 
-        return Task.FromResult(CreateNewUserState(key));
+        return Task.FromResult(state);
     }
 
     public Task SetUserState(string key, UserState content)
     {
-        lock (Lock)
-        {
-            Store[key] = content;
-        }
-
+        _cache.Set(key, content, new MemoryCacheEntryOptions { SlidingExpiration = Expiry });
         return Task.CompletedTask;
     }
 
     public Task ClearUserState(string key)
     {
-        lock (Lock)
-        {
-            Store.Remove(key);
-        }
+        _cache.Remove(key);
         return Task.CompletedTask;
     }
 }

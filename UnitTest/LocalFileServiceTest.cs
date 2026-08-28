@@ -1,104 +1,94 @@
-﻿using Core;
-using Core.Services;
 using Core.Services.Files;
 
 namespace UnitTest;
 
-public class LocalFileServiceTest
+public class LocalFileServiceTest : IDisposable
 {
-    [Fact]
-    public void Test1() { }
+    private readonly string _tempDir = Path.Combine(
+        Path.GetTempPath(),
+        Guid.NewGuid().ToString()
+    );
+    private readonly LocalFileService _service = new();
+
+    public LocalFileServiceTest()
+    {
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
 
     [Fact]
     public void UpsertFile_CreatesAndUpdatesFile()
     {
         // Arrange
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
-        var relativeFilePath = "testfile.txt";
+        var relativeFilePath = "testfile.md";
         var initialContent = "Hello, world!";
         var updatedContent = "Updated content.";
-        var service = new LocalFileService();
 
-        try
-        {
-            // Act - create
-            service.UpsertFile(tempDir, relativeFilePath, initialContent);
-            var fullPath = Path.Combine(tempDir, relativeFilePath);
-            Assert.True(File.Exists(fullPath));
-            Assert.Equal(initialContent, File.ReadAllText(fullPath));
-            var fileCreationDate = File.GetCreationTime(fullPath);
-            var fileModificationDate = File.GetLastWriteTime(fullPath);
+        // Act - create
+        _service.UpsertFile(_tempDir, relativeFilePath, initialContent);
+        var fullPath = Path.Combine(_tempDir, relativeFilePath);
+        Assert.True(File.Exists(fullPath));
+        Assert.Equal(initialContent, File.ReadAllText(fullPath));
+        var fileCreationDate = File.GetCreationTime(fullPath);
+        var fileModificationDate = File.GetLastWriteTime(fullPath);
 
-            // Act - update
-            service.UpsertFile(tempDir, relativeFilePath, updatedContent);
-            Assert.Equal(updatedContent, File.ReadAllText(fullPath));
-            Assert.Equal(fileCreationDate, File.GetCreationTime(fullPath));
-            Assert.True(File.GetLastWriteTime(fullPath) > fileModificationDate);
-        }
-        finally
-        {
-            // Cleanup
-            Directory.Delete(tempDir, true);
-        }
+        // Act - update
+        _service.UpsertFile(_tempDir, relativeFilePath, updatedContent);
+        Assert.Equal(updatedContent, File.ReadAllText(fullPath));
+        Assert.Equal(fileCreationDate, File.GetCreationTime(fullPath));
+        Assert.True(File.GetLastWriteTime(fullPath) > fileModificationDate);
     }
 
     [Fact]
-    public void GetMatchResults_ReturnsCorrectScores()
+    public void UpsertFile_CreatesMissingDirectories()
     {
-        // Arrange
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
-        var service = new LocalFileService();
+        _service.UpsertFile(_tempDir, "recipes/desserts/cake.md", "content");
 
-        // Create files with tags in YAML front matter and file names
-        var file1 = "note1.md";
-        var content1 = "---\ntags:\n  - keyword\n  - test\n---\nContent 1";
+        Assert.True(File.Exists(Path.Combine(_tempDir, "recipes", "desserts", "cake.md")));
+    }
 
-        var file2 = "project-keyword.md";
-        var content2 = "---\ntags:\n  - other\n---\nContent 2";
+    [Theory]
+    // File paths can be suggested by the AI model, so they are untrusted input.
+    [InlineData("../escaped.md")]
+    [InlineData("notes/../../escaped.md")]
+    [InlineData("/tmp/escaped.md")]
+    public void UpsertFile_RejectsPathsOutsideTheVault(string relativeFilePath)
+    {
+        var escapeTarget = Path.GetFullPath(Path.Combine(_tempDir, relativeFilePath));
 
-        var file3 = "random.md";
-        var content3 = "No front matter here.";
+        Assert.Throws<VaultPathException>(
+            () => _service.UpsertFile(_tempDir, relativeFilePath, "owned")
+        );
+        Assert.False(File.Exists(escapeTarget));
+    }
 
-        File.WriteAllText(Path.Combine(tempDir, file1), content1);
-        File.WriteAllText(Path.Combine(tempDir, file2), content2);
-        File.WriteAllText(Path.Combine(tempDir, file3), content3);
+    [Theory]
+    [InlineData("notes/script.sh")]
+    [InlineData("secrets.json")]
+    public void UpsertFile_RejectsNonMarkdownFiles(string relativeFilePath)
+    {
+        Assert.Throws<VaultPathException>(
+            () => _service.UpsertFile(_tempDir, relativeFilePath, "content")
+        );
+        Assert.False(File.Exists(Path.Combine(_tempDir, relativeFilePath)));
+    }
 
-        var keywords = new List<string> { "keyword", "project" };
+    [Fact]
+    public void FileExists_ReturnsFalseForPathsOutsideTheVault()
+    {
+        Assert.False(_service.FileExists(_tempDir, "../escaped.md"));
+    }
 
-        try
-        {
-            // Act
-            var results = service.GetMatchResults(tempDir, keywords);
-
-            // Assert
-            var result1 = results.FirstOrDefault(r => r.RelativeFilePath == file1);
-            var result2 = results.FirstOrDefault(r => r.RelativeFilePath == file2);
-            var result3 = results.FirstOrDefault(r => r.RelativeFilePath == file3);
-
-            Assert.NotNull(result1);
-            Assert.NotNull(result2);
-            Assert.NotNull(result3);
-
-            // file1: tag "keyword" matches (score +1)
-            Assert.Equal(1, result1.Score);
-
-            // file2: file name contains "project" and "keyword" (score +4)
-            Assert.Equal(4, result2.Score);
-
-            // file3: no tags, no file name match
-            Assert.Equal(0, result3.Score);
-
-            // Results should be sorted descending by score
-            Assert.Equal(
-                new[] { file2, file1, file3 },
-                results.Select(r => r.RelativeFilePath).ToArray()
-            );
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
+    [Fact]
+    public void GetFileContent_RejectsPathsOutsideTheVault()
+    {
+        Assert.Throws<VaultPathException>(() => _service.GetFileContent(_tempDir, "../escaped.md"));
     }
 }

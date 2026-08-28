@@ -2,7 +2,8 @@ using System.Net.Http.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
+using Core.Shared;
+using Microsoft.Extensions.Options;
 
 namespace Core.Services.AI;
 
@@ -11,12 +12,10 @@ public class OllamaService : IAiService
     private readonly HttpClient _httpClient;
     private readonly string _model;
 
-    public OllamaService(IConfiguration configuration, HttpClient httpClient)
+    public OllamaService(IOptions<OllamaOptions> options, HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _model =
-            configuration.GetValue<string?>("Ollama:Model")
-            ?? throw new InvalidOperationException("Ollama:Model is missing");
+        _model = options.Value.Model;
     }
 
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -27,9 +26,18 @@ public class OllamaService : IAiService
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    private async Task<TPrompt> QueryOllamaAsync<TPrompt>(string prompt)
+    private async Task<TPrompt> QueryOllamaAsync<TPrompt>(
+        string prompt,
+        CancellationToken cancellationToken
+    )
         where TPrompt : IPrompt
     {
+        using var activity = AutoJotDiagnostics.ActivitySource.StartActivity(
+            $"ai.ollama {typeof(TPrompt).Name}"
+        );
+        activity?.SetTag("ai.provider", "ollama");
+        activity?.SetTag("ai.model", _model);
+
         var response = await _httpClient.PostAsJsonAsync(
             "api/generate",
             new
@@ -39,12 +47,13 @@ public class OllamaService : IAiService
                 system = $"Use the language used by the user input \n\n {TPrompt.OllamaInstructions}",
                 format = JsonSerializer.Deserialize<dynamic>(TPrompt.JsonSchema),
                 prompt,
-            }
+            },
+            cancellationToken
         );
 
         response.EnsureSuccessStatusCode();
 
-        var responseString = await response.Content.ReadAsStringAsync();
+        var responseString = await response.Content.ReadAsStringAsync(cancellationToken);
         using var doc = JsonDocument.Parse(responseString);
         var responseNode = doc.RootElement.GetProperty("response").GetString();
 
@@ -56,16 +65,21 @@ public class OllamaService : IAiService
         return result!;
     }
 
-    public async Task<MessageClassificationResult> ClassifyMessage(string userInput)
+    public async Task<MessageClassificationResult> ClassifyMessage(
+        string userInput,
+        CancellationToken cancellationToken = default
+    )
     {
         var prompt = $"User input: {userInput}";
 
-        var resultJson = await QueryOllamaAsync<MessageClassificationResult>(prompt);
-
-        return resultJson;
+        return await QueryOllamaAsync<MessageClassificationResult>(prompt, cancellationToken);
     }
 
-    public async Task<CreateNoteResult> CreateNote(string userInput, List<string> existingFolders)
+    public async Task<CreateNoteResult> CreateNote(
+        string userInput,
+        List<string> existingFolders,
+        CancellationToken cancellationToken = default
+    )
     {
         var prompt = $"""
             Existing folders: {string.Join(", ", existingFolders)}
@@ -73,12 +87,14 @@ public class OllamaService : IAiService
             User input: {userInput}
             """;
 
-        var result = await QueryOllamaAsync<CreateNoteResult>(prompt);
-
-        return result;
+        return await QueryOllamaAsync<CreateNoteResult>(prompt, cancellationToken);
     }
 
-    public async Task<UpdateNoteResult> UpdateNote(string input, string existingFileContent)
+    public async Task<UpdateNoteResult> UpdateNote(
+        string input,
+        string existingFileContent,
+        CancellationToken cancellationToken = default
+    )
     {
         var prompt = $"""
             Existing file content: {existingFileContent}
@@ -87,14 +103,17 @@ public class OllamaService : IAiService
             ---
             User input: {input}
             """;
-        var result = await QueryOllamaAsync<UpdateNoteResult>(prompt);
-        return result;
+
+        return await QueryOllamaAsync<UpdateNoteResult>(prompt, cancellationToken);
     }
 
-    public async Task<List<string>> GetKeyWords(string input)
+    public async Task<List<string>> GetKeyWords(
+        string input,
+        CancellationToken cancellationToken = default
+    )
     {
         var prompt = $"User input: {input}";
-        var result = await QueryOllamaAsync<GetKeywordsResult>(prompt);
+        var result = await QueryOllamaAsync<GetKeywordsResult>(prompt, cancellationToken);
         return result.Keywords;
     }
 }

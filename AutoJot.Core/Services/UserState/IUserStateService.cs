@@ -22,6 +22,8 @@ public record UserState
     {
         return this with { Messages = new List<IChatMessage>(Messages) { message } };
     }
+
+    public MenuMessage? CurrentMenu => Messages.OfType<MenuMessage>().LastOrDefault();
 }
 
 public interface IChatMessage;
@@ -45,51 +47,57 @@ public enum TextOrigin
 
 public record MenuMessage : IChatMessage
 {
+    /// <summary>
+    /// Identifies this menu in the callback data of its buttons, so a tap on a menu that has since
+    /// been superseded can be recognised and rejected instead of acted on.
+    /// </summary>
+    public string Id { get; init; } = Guid.NewGuid().ToString("N")[..8];
+
     public string HeaderText { get; set; } = "Multiple file matches found:";
-    public string FooterText { get; set; } =
-        "Which option do you wanna choose? (select by index number)";
+    public string FooterText { get; set; } = "Pick an option below, or send /cancel to start over.";
 
     public IReadOnlyList<MenuOption> FileOptions { get; set; } = [];
     public IReadOnlyList<MenuOption> ExtraOptions { get; set; } = [];
 
-    public MenuOption? GetActionFromOption(string option)
+    public IReadOnlyList<MenuOption> AllOptions => [.. FileOptions, .. ExtraOptions];
+
+    /// <summary>
+    /// Telegram caps callback data at 64 bytes, so buttons carry a menu id and an index rather
+    /// than a note path.
+    /// </summary>
+    public string CallbackDataFor(int index) => $"{Id}:{index}";
+
+    public MenuSelection? Resolve(string callbackData)
     {
-        if (!int.TryParse(option, out var index))
+        var separator = callbackData.IndexOf(':');
+
+        if (separator <= 0 || !callbackData.AsSpan(..separator).SequenceEqual(Id))
         {
             return null;
         }
 
-        index -= 1;
-        var allOptions = FileOptions.Union(ExtraOptions).ToList();
-        return allOptions.ElementAtOrDefault(index);
+        if (!int.TryParse(callbackData.AsSpan((separator + 1)..), out var index))
+        {
+            return null;
+        }
+
+        var options = AllOptions;
+
+        return index < 0 || index >= options.Count
+            ? null
+            : new MenuSelection(options[index], index < FileOptions.Count);
     }
 
     public override string ToString()
     {
-        var currentIndex = 0;
-        var message = $"{HeaderText}\n\n";
-
-        foreach (var option in FileOptions)
-        {
-            currentIndex++;
-            message += $"{currentIndex} - {option.Name}\n";
-        }
-
-        if (ExtraOptions.Count > 0)
-        {
-            message += "\n";
-            foreach (var option in ExtraOptions)
-            {
-                currentIndex++;
-                message += $"{currentIndex} - {option.Name}\n";
-            }
-        }
-
-        message += $"\n\n{FooterText}";
-
-        return message;
+        return $"{HeaderText}\n\n{FooterText}";
     }
 }
+
+/// <param name="IsFileOption">
+/// True when the option names a note, as opposed to an action like "Create new note".
+/// </param>
+public record MenuSelection(MenuOption Option, bool IsFileOption);
 
 public record MenuOption
 {

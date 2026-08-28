@@ -2,10 +2,21 @@ namespace Core.Services.AI;
 
 public interface IAiService
 {
-    Task<MessageClassificationResult> ClassifyMessage(string userInput);
-    Task<CreateNoteResult> CreateNote(string userInput, List<string> existingFolders);
-    Task<UpdateNoteResult> UpdateNote(string input, string existingFileContent);
-    Task<List<string>> GetKeyWords(string input);
+    Task<MessageClassificationResult> ClassifyMessage(
+        string userInput,
+        CancellationToken cancellationToken = default
+    );
+    Task<CreateNoteResult> CreateNote(
+        string userInput,
+        List<string> existingFolders,
+        CancellationToken cancellationToken = default
+    );
+    Task<UpdateNoteResult> UpdateNote(
+        string input,
+        string existingFileContent,
+        CancellationToken cancellationToken = default
+    );
+    Task<List<string>> GetKeyWords(string input, CancellationToken cancellationToken = default);
 
     public static class Types
     {
